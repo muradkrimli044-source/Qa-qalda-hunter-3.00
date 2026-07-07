@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Qaşqaldağ Hunter 3.0 - Pro</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nosifer&family=Oswald:wght@700&family=Special+Elite&display=swap');
+
+        body { margin: 0; overflow: hidden; background: #000; cursor: none; font-family: 'Courier New', Courier, monospace; touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+        canvas { display: block; }
+
+        /* GİRİŞ EKRANI */
+        #start-overlay { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: url('https://i.postimg.cc/8CjsrmF9/kubik-piksel-oyun-seviyesi-arka-plan-vektor-cercevesi-53500-457.jpg') no-repeat center center; 
+            background-size: cover; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            z-index: 800; 
+            flex-direction: column; 
+            color: white; 
+        }
+        
+        #creator-tag {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-family: 'Oswald', sans-serif;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            letter-spacing: 1px;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        #game-title-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 10px;
+            margin-top: 50px;
+            perspective: 1000px;
+        }
+
+        .drop-word {
+            font-family: 'Nosifer', cursive;
+            color: #ff0000;
+            font-size: 6vw;
+            text-shadow: 5px 5px 15px #000;
+            opacity: 0;
+            transform: translateY(-500px);
+            display: block;
+        }
+
+        .animate-drop {
+            animation: wordDrop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes wordDrop {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .shake-screen {
+            animation: screenShake 0.3s ease-in-out;
+        }
+
+        @keyframes screenShake {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-10px, 10px); }
+            40% { transform: translate(10px, -10px); }
+            60% { transform: translate(-10px, -10px); }
+            80% { transform: translate(10px, 10px); }
+        }
+
+        .start-btn-cls { 
+            padding: 15px 50px; 
+            font-size: 28px; 
+            background: rgba(231, 76, 60, 0.8); 
+            color: white; 
+            border: 4px solid #fff; 
+            cursor: pointer; 
+            font-family: 'Oswald', sans-serif; 
+            transition: 0.3s; 
+            letter-spacing: 3px;
+            margin-bottom: 15px;
+            opacity: 0; 
+        }
+        .start-btn-cls.show-btn { opacity: 1; }
+        .start-btn-cls:hover { background: #fff; color: #e74c3c; transform: scale(1.1); }
+
+        #start-settings-btn {
+            background: rgba(41, 128, 185, 0.8);
+            padding: 10px 30px;
+            font-size: 18px;
+            color: white;
+            border: 2px solid #fff;
+            cursor: pointer;
+            font-family: 'Oswald', sans-serif;
+            transition: 0.3s;
+            opacity: 0;
+        }
+        #start-settings-btn.show-btn { opacity: 1; }
+        #start-settings-btn:hover { background: #fff; color: #2980b9; }
+        
+        #ui { position: absolute; top: 15px; left: 15px; font-size: 18px; color: #fff; text-shadow: 1px 1px 0 #000; z-index: 100; pointer-events: none; }
+        #gun-name-display { color: #ffff00; display: block; margin-top: 3px; font-size: 16px; }
+        #ammo-display { color: #ff4d4d; font-weight: bold; font-size: 14px; margin-top: 5px; }
+        
+        #combo-ui { 
+            position: absolute; 
+            top: 5px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            font-family: 'Oswald', sans-serif; 
+            color: #00ffff; 
+            font-size: 24px; 
+            text-shadow: 2px 2px 4px #000; 
+            display: none; 
+            z-index: 100; 
+            pointer-events: none; 
+            letter-spacing: 1px;
+        }
+
+        #special-text { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0); font-size: 8vw; color: #ffff00; font-weight: bold; text-shadow: 4px 4px 0 #000; display: none; z-index: 500; pointer-events: none; transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); width: 90%; text-align: center; }
+        .show-text { display: block !important; transform: translate(-50%, -50%) scale(1) !important; opacity: 1; }
+
+        #reload-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none; 
+            z-index: 650;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        #reload-text { 
+            font-family: 'Oswald', sans-serif; 
+            font-size: 24px; 
+            color: #ff4d4d; 
+            text-shadow: 2px 2px 5px #000; 
+            letter-spacing: 3px;
+            margin-bottom: 10px; 
+            animation: blink 0.4s infinite alternate;
+        }
+
+        #reload-bar-bg {
+            width: 200px;
+            height: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #fff;
+            border-radius: 4px;
+            overflow: hidden; 
+            margin: 0 auto;
+        }
+
+        #reload-bar-fill {
+            width: 0%; 
+            height: 100%;
+            background: lime; 
+            transition: width 0.05s linear; 
+        }
+
+        @keyframes blink { from { opacity: 1; } to { opacity: 0.4; } }
+        
+        #pause-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 950; color: white; flex-direction: column; }
+        .settings-box { background: #222; padding: 30px; border: 2px solid #2980b9; border-radius: 10px; text-align: center; min-width: 300px; max-height: 90vh; overflow-y: auto; pointer-events: auto; }
+        .setting-row { margin: 15px 0; }
+        .color-dot { width: 30px; height: 30px; display: inline-block; cursor: pointer; border: 2px solid #fff; margin: 0 5px; border-radius: 50%; }
+        
+        .control-btn { padding: 10px 20px; font-size: 14px; border: 2px solid #fff; cursor: pointer; background: #2980b9; color: white; font-weight: bold; pointer-events: auto; }
+        
+        .preview-box { display: inline-block; width: 20px; height: 20px; position: relative; vertical-align: middle; pointer-events: none; }
+        .preview-classic { border: 1.5px solid white; border-radius: 50%; }
+        .preview-classic::after { content: ''; position: absolute; top: 50%; left: -2px; width: 24px; height: 1.5px; background: white; }
+        .preview-classic::before { content: ''; position: absolute; left: 50%; top: -2px; height: 24px; width: 1.5px; background: white; }
+        .preview-dot { background: white; width: 8px !important; height: 8px !important; border-radius: 50%; margin: 6px; }
+        .preview-square { border: 1.5px solid white; width: 18px !important; height: 18px !important; }
+
+        #shop-menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(17, 17, 17, 0.95); border: 5px solid #f1c40f; padding: 20px; color: white; display: none; z-index: 1000; text-align: center; width: 350px; max-height: 80vh; overflow-y: auto; }
+        #close-shop { position: absolute; top: 10px; right: 10px; font-size: 24px; color: #ff4d4d; cursor: pointer; font-weight: bold; border: 2px solid #ff4d4d; width: 35px; height: 35px; line-height: 30px; border-radius: 5px; background: rgba(0,0,0,0.5); }
+        
+        .item { margin: 10px 0; padding: 12px; border: 1px solid #444; display: flex; justify-content: space-between; align-items: center; cursor: pointer; pointer-events: auto; }
+        .shop-section { margin-top: 20px; border-top: 2px solid #f1c40f; padding-top: 10px; }
+        
+        #crosshair { 
+            position: absolute; 
+            width: 30px; 
+            height: 30px; 
+            pointer-events: none; 
+            transform: translate(-50%, -50%); 
+            z-index: 1100; 
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .ch-classic { border: 2px solid red; border-radius: 50%; }
+        .ch-classic::after { content: ''; position: absolute; width: 40px; height: 2px; background: red; }
+        .ch-classic::before { content: ''; position: absolute; height: 40px; width: 2px; background: red; }
+        
+        .ch-dot { background: red; width: 10px !important; height: 10px !important; border-radius: 50%; box-shadow: 0 0 10px red; border: none !important; }
+        .ch-dot::after, .ch-dot::before { display: none !important; }
+
+        .ch-square { border: 2px solid red; width: 22px !important; height: 22px !important; border-radius: 0 !important; }
+        .ch-square::after { content: ''; position: absolute; width: 4px; height: 4px; background: red; }
+        .ch-square::before { display: none !important; }
+        
+        .lang-btn { margin: 5px; background: #444; border: 1px solid #888; color: white; cursor: pointer; padding: 10px 20px; font-weight: bold; }
+        .lang-btn.active { background: #2980b9; border-color: #fff; }
+        
+        #music-toggle-btn { background: #e67e22; border-color: #fff; }
+        #music-toggle-btn.muted { background: #7f8c8d; }
+
+        .divider { border: none; border-top: 1px solid rgba(255, 255, 255, 0.2); margin: 15px 0; }
+        
+        #main-menu-btn { background: #c0392b; margin-top: 10px; width: 100%; border-color: #fff; }
+        #main-menu-btn:hover { background: #ff4d4d; }
+    </style>
+</head>
+<body oncontextmenu="return false;" onclick="autoPlayMusic()">
+
+    <audio id="bgMusic" loop>
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" type="audio/mpeg">
+    </audio>
+
+    <div id="start-overlay">
+        <div id="creator-tag">creator:şahmurad</div>
+        <div id="game-title-container">
+            <span class="drop-word" id="word1">QAŞQALDAĞ</span>
+            <span class="drop-word" id="word2">HUNTER</span>
+            <span class="drop-word" id="word3">3.0</span>
+        </div>
+        <button id="start-btn" class="start-btn-cls" onclick="startGame()">PLAY</button>
+        <button id="start-settings-btn" onclick="openStartSettings()">AYARLAR</button>
+    </div>
+
+    <div id="reload-container">
+        <div id="reload-text">DOLDURULUR...</div>
+        <div id="reload-bar-bg">
+            <div id="reload-bar-fill"></div>
+        </div>
+    </div>
+
+    <div id="pause-overlay">
+        <div class="settings-box">
+            <h1 id="settings-title" style="font-family: 'Oswald'; margin-top: 0;">AYARLAR</h1>
+            <div class="setting-row">
+                <p id="music-label" style="font-weight: bold; color: #e67e22; margin-bottom: 5px;">MÜZİK</p>
+                <button id="music-toggle-btn" class="control-btn" onclick="toggleMusic()">AÇIK</button>
+            </div>
+            <hr class="divider">
+            <div class="setting-row">
+                <p id="lang-title" style="font-weight: bold; color: #2ecc71; margin-bottom: 5px;">DİL</p>
+                <button class="lang-btn" onclick="setLanguage('tr')">TR</button>
+                <button class="lang-btn" onclick="setLanguage('en')">EN</button>
+            </div>
+            <hr style="border: 1px solid #444; margin: 10px 0;">
+            <div class="setting-row">
+                <p id="ch-color-label">NİŞANGAH RENGİ</p>
+                <div class="color-dot" style="background: red;" onclick="changeChColor('red')"></div>
+                <div class="color-dot" style="background: lime;" onclick="changeChColor('lime')"></div>
+                <div class="color-dot" style="background: cyan;" onclick="changeChColor('cyan')"></div>
+                <div class="color-dot" style="background: yellow;" onclick="changeChColor('yellow')"></div>
+            </div>
+            <div class="setting-row">
+                <p id="ch-style-label">NİŞANGAH ŞEKLİ</p>
+                <button class="control-btn" style="padding: 15px; margin: 2px;" onclick="changeChStyle('ch-classic')">
+                    <div class="preview-box preview-classic"></div>
+                </button>
+                <button class="control-btn" style="padding: 15px; margin: 2px;" onclick="changeChStyle('ch-dot')">
+                    <div class="preview-box preview-dot"></div>
+                </button>
+                <button class="control-btn" style="padding: 15px; margin: 2px;" onclick="changeChStyle('ch-square')">
+                    <div class="preview-box preview-square"></div>
+                </button>
+            </div>
+            <hr style="border: 2px solid #444; margin: 20px 0;">
+            <button id="resume-btn" class="control-btn" style="font-size: 18px; width: 100%;" onclick="togglePause()">DEVAM ET</button>
+            <button id="main-menu-btn" class="control-btn" onclick="resetToMainMenu()">ANA MENYU</button>
+        </div>
+    </div>
+
+    <div id="special-text">QAŞQALDAĞ</div>
+
+    <div id="ui">
+        <span id="score-label">SKOR</span>: <span id="score">0</span><br>
+        <span id="gun-name-display">M1911 Pistol</span>
+        <div id="ammo-display"><span id="ammo-label">MERMİ</span>: <span id="ammo-count">7/7</span></div>
+    </div>
+
+    <div id="combo-ui">COMBO X<span id="combo-count">0</span></div>
+    
+    <div style="position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: center; gap: 25vw; z-index: 600;">
+        <button id="set-btn-ui" class="control-btn" onclick="togglePause()">AYARLAR</button>
+        <button id="shop-btn-ui" class="control-btn" onclick="handleShopToggle()">MARKET</button>
+    </div>
+
+    <div id="shop-menu">
+        <div id="close-shop" onclick="handleShopToggle()">X</div>
+        <h2 id="shop-title" style="color:#f1c40f; font-family: 'Oswald';">SİLAH ARSENALİ</h2>
+        <div id="guns-container"></div>
+        <div class="shop-section">
+            <h2 id="gloves-title" style="color:#2ecc71; font-family: 'Oswald';">ELDİVENLER</h2>
+            <div id="gloves-container"></div>
+        </div>
+    </div>
+
+    <div id="crosshair" class="ch-classic"></div>
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreElement = document.getElementById('score');
+    const gunNameDisplay = document.getElementById('gun-name-display');
+    const ammoCountElement = document.getElementById('ammo-count');
+    const bgMusic = document.getElementById('bgMusic');
+    const crosshair = document.getElementById('crosshair');
+    const reloadContainer = document.getElementById('reload-container');
+    const reloadText = document.getElementById('reload-text');
+    const reloadBarFill = document.getElementById('reload-bar-fill');
+    const comboUI = document.getElementById('combo-ui');
+    const comboCountElement = document.getElementById('combo-count');
+    const musicBtn = document.getElementById('music-toggle-btn');
+    
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let score = 0, hitCounter = 0, birds = [], clouds = [], particles = [], gameTrees = [];
+    let weatherParticles = []; 
+    let targetWeather = "sunny";
+    let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+    let gunRecoil = 0, muzzleFlash = 0, shake = 0, isPaused = true, isShopOpen = false, audioCtx;
+    let isReloading = false, gameTime = 0, stars = [];
+    let isFiring = false, fireInterval = null;
+    let shootingStars = [];
+    let musicMuted = false;
+
+    let comboCount = 0;
+    let lastHitTime = 0;
+    const comboLimit = 3000;
+    let pauseStartTime = 0;
+    let lastEventTime = 0; 
+
+    function runIntroAnimation() {
+        const overlay = document.getElementById('start-overlay');
+        const words = [
+            document.getElementById('word1'),
+            document.getElementById('word2'),
+            document.getElementById('word3')
+        ];
+        const buttons = [
+            document.getElementById('start-btn'),
+            document.getElementById('start-settings-btn')
+        ];
+
+        words.forEach((word, index) => {
+            setTimeout(() => {
+                word.classList.add('animate-drop');
+                setTimeout(() => {
+                    overlay.classList.add('shake-screen');
+                    playImpactSound();
+                    setTimeout(() => overlay.classList.remove('shake-screen'), 300);
+                }, 500); 
+            }, index * 800);
+        });
+
+        setTimeout(() => {
+            buttons.forEach(btn => btn.classList.add('show-btn'));
+        }, words.length * 850);
+    }
+
+    function playImpactSound() {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(60, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+    }
+
+    const translations = {
+        tr: { settings: "AYARLAR", resume: "DEVAM ET", chColor: "NİŞANGAH RENGİ", chStyle: "NİŞANGAH ŞEKLİ", score: "SKOR", market: "MARKET", arsenal: "SİLAH ARSENALİ", gloves: "ELDİVENLER", ammo: "MERMİ", play: "OYNA", lang: "DİL", reloading: "DOLDURULUR...", music: "MÜZİK", on: "AÇIK", off: "KAPALI", mainMenu: "ANA MENYU" },
+        en: { settings: "SETTINGS", resume: "RESUME", chColor: "CROSSHAIR COLOR", chStyle: "CROSSHAIR STYLE", score: "SCORE", market: "MARKET", arsenal: "GUN ARSENAL", gloves: "GLOVES", ammo: "AMMO", play: "PLAY", lang: "LANGUAGE", reloading: "RELOADING...", music: "MUSIC", on: "ON", off: "OFF", mainMenu: "MAIN MENU" }
+    };
+
+    let currentLang = 'tr';
+
+    function openStartSettings() {
+        document.getElementById('pause-overlay').style.display = 'flex';
+        document.getElementById('main-menu-btn').style.display = 'none';
+    }
+
+    function autoPlayMusic() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (bgMusic.paused && !musicMuted) {
+            bgMusic.volume = 0.4;
+            bgMusic.play().catch(() => {});
+        }
+    }
+
+    function toggleMusic() {
+        musicMuted = !musicMuted;
+        if (musicMuted) {
+            bgMusic.pause();
+            musicBtn.innerText = translations[currentLang].off;
+            musicBtn.classList.add('muted');
+        } else {
+            bgMusic.play();
+            musicBtn.innerText = translations[currentLang].on;
+            musicBtn.classList.remove('muted');
+        }
+    }
+
+    function setLanguage(lang) {
+        currentLang = lang;
+        document.getElementById('settings-title').innerText = translations[lang].settings;
+        document.getElementById('resume-btn').innerText = translations[lang].resume;
+        document.getElementById('ch-color-label').innerText = translations[lang].chColor;
+        document.getElementById('ch-style-label').innerText = translations[lang].chStyle;
+        document.getElementById('score-label').innerText = translations[lang].score;
+        document.getElementById('set-btn-ui').innerText = translations[lang].settings;
+        document.getElementById('shop-btn-ui').innerText = translations[lang].market;
+        document.getElementById('shop-title').innerText = translations[lang].arsenal;
+        document.getElementById('gloves-title').innerText = translations[lang].gloves;
+        document.getElementById('start-btn').innerText = translations[lang].play;
+        document.getElementById('start-settings-btn').innerText = translations[lang].settings;
+        document.getElementById('ammo-label').innerText = translations[lang].ammo;
+        document.getElementById('lang-title').innerText = translations[lang].lang;
+        document.getElementById('music-label').innerText = translations[lang].music;
+        document.getElementById('main-menu-btn').innerText = translations[lang].mainMenu;
+        musicBtn.innerText = musicMuted ? translations[lang].off : translations[lang].on;
+        reloadText.innerText = translations[lang].reloading;
+        
+        document.querySelectorAll('.lang-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if(btn.innerText.toLowerCase() === lang) btn.classList.add('active');
+        });
+    }
+
+    function changeChColor(color) {
+        let styleTag = document.getElementById('custom-ch-style');
+        if (!styleTag) {
+            styleTag = document.createElement('style');
+            styleTag.id = 'custom-ch-style';
+            document.head.appendChild(styleTag);
+        }
+        styleTag.innerHTML = `
+            #crosshair.ch-classic { border-color: ${color} !important; }
+            #crosshair.ch-classic::after, #crosshair.ch-classic::before { background: ${color} !important; }
+            #crosshair.ch-dot { background: ${color} !important; box-shadow: 0 0 10px ${color} !important; }
+            #crosshair.ch-square { border-color: ${color} !important; }
+            #crosshair.ch-square::after { background: ${color} !important; }
+        `;
+    }
+
+    function changeChStyle(styleName) { 
+        crosshair.className = ''; 
+        crosshair.classList.add(styleName); 
+    }
+
+    const guns = [
+        { id: 'm1911', name: "M1911 Pistol", price: 0, color: "#c0c0c0", sideColor: "#8a8a8a", shake: 6, freq: 180, sound: 'square', owned: true, maxAmmo: 7, currentAmmo: 7, reloadTime: 1000, auto: false },
+        { id: 'deagle', name: "Desert Eagle", price: 10, color: "#c5b358", sideColor: "#a68d00", shake: 25, freq: 100, sound: 'triangle', owned: false, maxAmmo: 7, currentAmmo: 7, reloadTime: 1800, auto: false },
+        { id: 'gold', name: "Gold Revolver", price: 50, color: "#f1c40f", sideColor: "#d4ac0d", shake: 20, freq: 300, sound: 'square', owned: false, maxAmmo: 12, currentAmmo: 12, reloadTime: 2000, auto: false },
+        { id: 'glock', name: "Glock 17", price: 100, color: "#222", sideColor: "#000", shake: 8, freq: 200, sound: 'square', owned: false, maxAmmo: 17, currentAmmo: 17, reloadTime: 1200, auto: false },
+        { id: 'ak47', name: "AK-47 Assault", price: 200, color: "#4b2c20", sideColor: "#333", shake: 15, freq: 250, sound: 'sawtooth', owned: false, maxAmmo: 30, currentAmmo: 30, reloadTime: 2500, auto: true, fireRate: 120 },
+        { id: 'minigun', name: "The Shredder", price: 400, color: "#111", sideColor: "#555", shake: 30, freq: 400, sound: 'square', owned: false, maxAmmo: 100, currentAmmo: 100, reloadTime: 5000, auto: true, fireRate: 70 }
+    ];
+
+    const gloves = [
+        { id: 'basic', name: "Work Gloves", price: 25, bonus: 0.10, owned: false },
+        { id: 'leather', name: "Leather Gloves", price: 50, bonus: 0.20, owned: false },
+        { id: 'tactical', name: "Tactical Gloves", price: 100, bonus: 0.35, owned: false },
+        { id: 'hunter', name: "Hunter Gloves", price: 200, bonus: 0.50, owned: false },
+        { id: 'elite', name: "Elite Gloves", price: 400, bonus: 0.70, owned: false },
+        { id: 'cyber', name: "Cyber Gloves", price: 600, bonus: 0.90, owned: false }
+    ];
+
+    let currentGun = guns[0];
+    let currentGlove = null;
+
+    function updateAmmoDisplay() { ammoCountElement.innerText = `${currentGun.currentAmmo}/${currentGun.maxAmmo}`; }
+    function changeWeather() { const types = ["sunny", "rainy", "snowy"]; targetWeather = types[Math.floor(Math.random() * types.length)]; }
+    
+    setInterval(changeWeather, 60000);
+
+    function initEnv() {
+        clouds = []; stars = []; gameTrees = [];
+        for(let i=0; i<60; i++) stars.push({x: Math.random()*canvas.width, y: Math.random()*(canvas.height/1.5), s: Math.random()*1.5});
+        for(let i=0; i<5; i++) clouds.push({ x: Math.random() * canvas.width, y: 10 + Math.random() * 50, s: 1 + Math.random() });
+        
+        let treeCount = 14;
+        for(let i=0; i<treeCount; i++) {
+            let treeX = Math.random() * (canvas.width - 60) + 30;
+            let treeY = (canvas.height - 110) + Math.random() * 50; 
+            gameTrees.push({
+                x: treeX,
+                y: treeY,
+                size: 1.8 + Math.random() * 1.5 
+            });
+        }
+        gameTrees.sort((a, b) => a.y - b.y); 
+    }
+
+    class ShootingStar {
+        constructor() {
+            this.x = Math.random() * canvas.width;
+            this.y = Math.random() * (canvas.height / 2);
+            this.length = 50 + Math.random() * 80;
+            this.speed = 10 + Math.random() * 15;
+            this.opacity = 1.0;
+        }
+        update() {
+            this.x += this.speed;
+            this.y += this.speed * 0.5;
+            this.opacity -= 0.02;
+        }
+        draw() {
+            ctx.strokeStyle = `rgba(255, 255, 255, ${this.opacity})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y);
+            ctx.lineTo(this.x - this.length, this.y - (this.length * 0.5));
+            ctx.stroke();
+        }
+    }
+
+    class WeatherEffect {
+        constructor(type) { this.type = type; this.reset(); }
+        reset() {
+            this.x = Math.random() * canvas.width;
+            this.y = Math.random() * -canvas.height;
+            this.speed = this.type === "rainy" ? 14 + Math.random() * 4 : 2 + Math.random() * 2;
+            this.size = this.type === "rainy" ? 1.5 : 2 + Math.random() * 2;
+            this.life = 1.0;
+        }
+        update() {
+            this.y += this.speed;
+            if(this.type === "rainy") this.x += 0.5;
+            if(this.y > canvas.height) this.reset();
+            if (this.type !== targetWeather && targetWeather !== "sunny") this.life -= 0.01;
+        }
+        draw() {
+            if(this.life <= 0) return;
+            ctx.globalAlpha = this.life;
+            ctx.fillStyle = this.type === "rainy" ? "rgba(174, 194, 224, 0.6)" : "#fff";
+            if(this.type === "rainy") ctx.fillRect(this.x, this.y, 1, 15);
+            else { ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill(); }
+            ctx.globalAlpha = 1.0;
+        }
+    }
+
+    class Bird {
+        constructor() { this.x = -100; this.y = 50 + Math.random() * (canvas.height - 250); this.speed = 3 + Math.random() * 4; this.wing = 0; this.size = 1.2; }
+        draw() {
+            ctx.save(); ctx.translate(this.x, this.y); ctx.scale(this.size, this.size); this.wing += 0.25;
+            let wY = Math.sin(this.wing) * 12; ctx.fillStyle = "white"; ctx.fillRect(0, 0, 30, 15);
+            ctx.fillStyle = "black"; ctx.fillRect(-5, wY, 15, 6); ctx.fillRect(-5, -wY-6, 15, 6);
+            ctx.fillStyle = "white"; ctx.fillRect(25, -8, 12, 12); ctx.fillStyle = "black"; ctx.fillRect(32, -4, 4, 4);
+            ctx.fillStyle = "#ff9800"; ctx.fillRect(37, -2, 8, 4); ctx.restore();
+        }
+        update() { 
+            if(!isPaused) {
+                this.x += this.speed; 
+                if (this.x > canvas.width + 100) { 
+                    score = Math.max(0, score - 1); 
+                    scoreElement.innerText = score; 
+                    comboCount = 0;
+                    comboUI.style.display = 'none';
+                    return true; 
+                }
+            }
+            return false;
+        }
+    }
+
+    class Particle {
+        constructor(x, y, isFeather = false) { 
+            this.x = x; 
+            this.y = y; 
+            this.isFeather = isFeather;
+            this.vx = (Math.random() - 0.5) * (isFeather ? 4 : 8); 
+            this.vy = (Math.random() - 0.5) * (isFeather ? 4 : 8); 
+            this.size = isFeather ? Math.random() * 5 + 3 : Math.random() * 4 + 2; 
+            this.life = 1.0; 
+            this.rotation = Math.random() * Math.PI * 2;
+            this.rotSpd = (Math.random() - 0.5) * 0.1;
+        }
+        update() { 
+            this.x += this.vx; 
+            this.y += this.vy; 
+            if(this.isFeather) {
+                this.vy += 0.05; 
+                this.rotation += this.rotSpd;
+                this.vx *= 0.99;
+            } else {
+                this.vy += 0.25; 
+            }
+            this.life -= 0.02; 
+        }
+        draw() { 
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.rotation);
+            if(this.isFeather) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.life})`;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, this.size, this.size/3, 0, 0, Math.PI*2);
+                ctx.fill();
+            } else {
+                ctx.fillStyle = `rgba(255, 0, 0, ${this.life})`; 
+                ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size); 
+            }
+            ctx.restore();
+        }
+    }
+
+    function drawPixelTree(x, y, scale) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(scale, scale);
+
+        ctx.fillStyle = "#5c4033"; 
+        ctx.fillRect(-3, -15, 6, 15);
+        ctx.fillStyle = "#3d2b1f"; 
+        ctx.fillRect(1, -15, 2, 15);
+
+        let leafColor1 = targetWeather === "snowy" ? "#eef2f7" : "#27ae60";
+        let leafColor2 = targetWeather === "snowy" ? "#d5dbdb" : "#219653";
+        let leafColor3 = targetWeather === "snowy" ? "#b2babb" : "#1e8449";
+
+        ctx.fillStyle = leafColor3; ctx.fillRect(-16, -23, 32, 8);
+        ctx.fillStyle = leafColor2; ctx.fillRect(-14, -23, 28, 8);
+        ctx.fillStyle = leafColor2; ctx.fillRect(-12, -31, 24, 8);
+        ctx.fillStyle = leafColor1; ctx.fillRect(-10, -31, 20, 8);
+        ctx.fillStyle = leafColor1; ctx.fillRect(-8, -39, 16, 8);
+        ctx.fillRect(-4, -43, 8, 4);
+        ctx.fillRect(-2, -45, 4, 2);
+
+        ctx.restore();
+    }
+
+    function animate() {
+        ctx.save();
+        if (shake > 0) { ctx.translate(Math.random()*shake-shake/2, Math.random()*shake-shake/2); shake *= 0.85; if(shake < 0.1) shake = 0; }
+        if(!isPaused) {
+            gameTime += 0.0008; 
+            if(comboCount > 0 && Date.now() - lastHitTime > comboLimit) {
+                comboCount = 0;
+                comboUI.style.display = 'none';
+            }
+        }
+        let cycle = (Math.sin(gameTime) + 1) / 2;
+        let r = 10 + 69 * cycle; let g = 10 + 150 * cycle; let b = 42 + 213 * cycle;
+        if(targetWeather !== "sunny") { r *= 0.7; g *= 0.7; b *= 0.8; }
+        ctx.fillStyle = `rgb(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        if (cycle < 0.6) { 
+            ctx.fillStyle = `rgba(255, 255, 255, ${1 - cycle * 1.5})`; 
+            stars.forEach(s => ctx.fillRect(s.x, s.y, s.s, s.s)); 
+            if (!isPaused && Math.random() < 0.005) shootingStars.push(new ShootingStar());
+            for (let i = shootingStars.length - 1; i >= 0; i--) {
+                shootingStars[i].update(); shootingStars[i].draw();
+                if (shootingStars[i].opacity <= 0) shootingStars.splice(i, 1);
+            }
+        }
+
+        let radiusX = canvas.width / 2 + 100;
+        let radiusY = canvas.height / 2;
+        let centerX = canvas.width / 2;
+        let centerY = canvas.height - 100;
+
+        let sunX = centerX + Math.cos(gameTime + Math.PI) * radiusX;
+        let sunY = centerY + Math.sin(gameTime + Math.PI) * radiusY;
+
+        let moonX = centerX + Math.cos(gameTime) * radiusX;
+        let moonY = centerY + Math.sin(gameTime) * radiusY;
+
+        if(sunY < canvas.height - 100) { 
+            ctx.fillStyle = "#f1c40f"; 
+            ctx.beginPath(); 
+            ctx.arc(sunX, sunY, 40, 0, Math.PI*2); 
+            ctx.fill(); 
+        }
+
+        if(moonY < canvas.height - 100) {
+            ctx.fillStyle = "#f5f3ce";
+            ctx.beginPath();
+            ctx.arc(moonX, moonY, 30, 0, Math.PI*2);
+            ctx.fill();
+            
+            let phaseShift = Math.cos(gameTime * 0.2) * 28; 
+            ctx.fillStyle = `rgb(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)})`;
+            ctx.beginPath();
+            ctx.arc(moonX + 12 + phaseShift, moonY - 4, 28, 0, Math.PI*2);
+            ctx.fill();
+        }
+        
+        clouds.forEach(c => {
+            if(!isPaused) c.x += 0.5; if(c.x > canvas.width) { c.x = -100; c.y = 10 + Math.random() * 50; }
+            ctx.fillStyle = targetWeather === "sunny" ? `rgba(255, 255, 255, ${0.3 + 0.5 * cycle})` : "rgba(100, 100, 120, 0.6)";
+            ctx.fillRect(c.x, c.y, 40*c.s, 15); ctx.fillRect(c.x-10, c.y+10, 60*c.s, 15);
+        });
+
+        let groundColor = targetWeather === "snowy" ? "#fff" : `rgb(${46 * (0.4 + 0.6 * cycle)}, ${204 * (0.4 + 0.6 * cycle)}, ${113 * (0.4 + 0.6 * cycle)})`;
+        ctx.fillStyle = groundColor; ctx.fillRect(0, canvas.height-120, canvas.width, 120);
+
+        gameTrees.forEach(t => {
+            drawPixelTree(t.x, t.y, t.size);
+        });
+
+        if(!isPaused) {
+            if(targetWeather !== "sunny" && weatherParticles.length < 100) weatherParticles.push(new WeatherEffect(targetWeather));
+            for(let i = weatherParticles.length - 1; i >= 0; i--) { weatherParticles[i].update(); weatherParticles[i].draw(); if(weatherParticles[i].life <= 0) weatherParticles.splice(i, 1); }
+        }
+        for(let i = particles.length - 1; i >= 0; i--) { particles[i].update(); particles[i].draw(); if(particles[i].life <= 0) particles.splice(i, 1); }
+        for(let i = birds.length - 1; i >= 0; i--) { const isEscaped = birds[i].update(); birds[i].draw(); if(isEscaped) birds.splice(i, 1); }
+        
+        // GUN RENDER
+        ctx.save();
+        let gunX = canvas.width/2, gunY = canvas.height;
+        ctx.translate(gunX, gunY); ctx.rotate(Math.atan2(mouse.y - gunY, mouse.x - gunX) + Math.PI/2);
+        ctx.fillStyle = currentGlove ? (currentGlove.id === 'cyber' ? '#00ffff' : '#222') : "#e0ac69"; 
+        ctx.beginPath(); ctx.ellipse(0, 10 + gunRecoil, 35, 45, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillRect(-22, -15 + gunRecoil, 12, 25); 
+        ctx.fillStyle = currentGlove ? "#444" : "#d29e5e"; ctx.fillRect(10, -10 + gunRecoil, 15, 40);
+        ctx.fillStyle = (currentGun.id === 'm1911' || currentGun.id === 'gold' || currentGun.id === 'ak47') ? "#4e342e" : "#111";
+        ctx.fillRect(-15, -40 + gunRecoil, 30, 75);
+        ctx.fillStyle = currentGun.sideColor; ctx.fillRect(10, -115 + gunRecoil, 2, 110); 
+        ctx.fillStyle = currentGun.color; ctx.fillRect(-12, -115 + gunRecoil, 24, 110); 
+        ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(0, -115 + gunRecoil, 6, 0, Math.PI*2); ctx.fill();
+        if(muzzleFlash > 0) { ctx.fillStyle = "rgba(255, 255, 0, 0.8)"; ctx.beginPath(); ctx.arc(0, -120 + gunRecoil, 30, 0, Math.PI*2); ctx.fill(); muzzleFlash--; }
+        ctx.restore();
+        if(!isReloading && gunRecoil < 0) gunRecoil += 5;
+        ctx.restore();
+        requestAnimationFrame(animate);
+    }
+
+    function updateCrosshair(x, y) {
+        mouse.x = x; mouse.y = y;
+        crosshair.style.left = x + 'px'; crosshair.style.top = y + 'px';
+    }
+
+    window.addEventListener('mousemove', e => updateCrosshair(e.clientX, e.clientY));
+
+    function shoot() {
+        if(isPaused || isShopOpen || isReloading || currentGun.currentAmmo <= 0) { 
+            if(currentGun.currentAmmo <= 0 && !isReloading && !isShopOpen && !isPaused) startReload(); 
+            return; 
+        }
+        let now = Date.now(); if (now - lastEventTime < 50) return; lastEventTime = now;
+        if (audioCtx) {
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.type = currentGun.sound; osc.frequency.setValueAtTime(currentGun.freq, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.08, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+        }
+        currentGun.currentAmmo--; updateAmmoDisplay(); gunRecoil = -35; muzzleFlash = 4; shake = currentGun.shake;
+        for(let i = birds.length - 1; i >= 0; i--) {
+            let b = birds[i]; let birdCenterX = b.x + 15 * b.size; let birdCenterY = b.y + 7 * b.size;
+            let dist = Math.hypot(mouse.x - birdCenterX, mouse.y - birdCenterY);
+            if(dist < 70 * b.size) { 
+                for(let j=0; j<8; j++) particles.push(new Particle(birdCenterX, birdCenterY, false)); 
+                for(let j=0; j<12; j++) particles.push(new Particle(birdCenterX, birdCenterY, true)); 
+                birds.splice(i, 1); comboCount++; lastHitTime = Date.now();
+                comboCountElement.innerText = comboCount; if(comboCount >= 2) comboUI.style.display = 'block';
+                score++; hitCounter++; scoreElement.innerText = score; 
+                if(hitCounter % 10 === 0) { document.getElementById('special-text').classList.add('show-text'); setTimeout(()=>document.getElementById('special-text').classList.remove('show-text'), 1200); }
+                break;
+            } 
+        }
+    }
+    
+    const handleFire = (e) => {
+        if(e.target.tagName === 'BUTTON' || e.target.closest('.item') || e.target.closest('.settings-box')) return;
+        autoPlayMusic();
+        if(currentGun.auto) { 
+            if(!isFiring) { isFiring = true; shoot(); fireInterval = setInterval(shoot, currentGun.fireRate); } 
+        } else { shoot(); }
+    };
+
+    window.addEventListener('mousedown', (e) => { if ('ontouchstart' in window) return; if (e.button === 0) handleFire(e); });
+    window.addEventListener('touchstart', (e) => { if (e.cancelable) e.preventDefault(); let t = e.touches[0]; updateCrosshair(t.clientX, t.clientY); handleFire(e); }, {passive: false});
+    window.addEventListener('mouseup', () => { isFiring = false; clearInterval(fireInterval); });
+    window.addEventListener('touchend', () => { isFiring = false; clearInterval(fireInterval); });
+    window.addEventListener('touchmove', (e) => { if(e.target.tagName === 'BUTTON' || e.target.closest('.item') || e.target.closest('.settings-box')) return; let t = e.touches[0]; updateCrosshair(t.clientX, t.clientY); }, {passive: false});
+
+    function startReload() {
+        if(isReloading) return; isFiring = false; clearInterval(fireInterval); isReloading = true;
+        reloadContainer.style.display = 'block'; reloadBarFill.style.width = '0%';
+        let bonusFactor = currentGlove ? (1 - currentGlove.bonus) : 1;
+        let actualReloadTime = currentGun.reloadTime * bonusFactor;
+        let rInterval = setInterval(() => { if (gunRecoil < 140) gunRecoil += 15; }, 16); 
+        let startTime = Date.now();
+        let barInterval = setInterval(() => {
+            let elapsedTime = Date.now() - startTime; let progress = (elapsedTime / actualReloadTime) * 100;
+            if (progress > 100) progress = 100; reloadBarFill.style.width = progress + '%';
+            if (progress >= 100) clearInterval(barInterval);
+        }, 20);
+        setTimeout(() => { clearInterval(rInterval); currentGun.currentAmmo = currentGun.maxAmmo; updateAmmoDisplay(); isReloading = false; gunRecoil = 0; reloadContainer.style.display = 'none'; }, actualReloadTime); 
+    }
+
+    function togglePause() { 
+        isPaused = !isPaused; 
+        document.getElementById('pause-overlay').style.display = isPaused ? 'flex' : 'none'; 
+        if(isPaused) { 
+            bgMusic.pause(); isFiring = false; clearInterval(fireInterval); pauseStartTime = Date.now();
+            document.getElementById('main-menu-btn').style.display = 'block';
+        } 
+        else { if(!musicMuted) bgMusic.play().catch(()=>{}); if(comboCount > 0) { let pauseDuration = Date.now() - pauseStartTime; lastHitTime += pauseDuration; } } 
+    }
+    
+    function resetToMainMenu() {
+        isPaused = true; score = 0; hitCounter = 0; comboCount = 0; birds = []; particles = [];
+        scoreElement.innerText = "0"; comboUI.style.display = 'none';
+        document.getElementById('pause-overlay').style.display = 'none';
+        document.getElementById('start-overlay').style.display = 'flex';
+        document.querySelectorAll('.drop-word').forEach(w => w.classList.remove('animate-drop'));
+        document.querySelectorAll('.show-btn').forEach(b => b.classList.remove('show-btn'));
+        runIntroAnimation();
+        bgMusic.pause(); bgMusic.currentTime = 0;
+    }
+
+    function handleShopToggle() { 
+        isShopOpen = !isShopOpen; isPaused = isShopOpen; 
+        document.getElementById('shop-menu').style.display = isShopOpen ? 'block' : 'none'; 
+        if(isShopOpen) { updateShopUI(); bgMusic.pause(); isFiring = false; clearInterval(fireInterval); pauseStartTime = Date.now(); } 
+        else { if(!musicMuted) bgMusic.play().catch(()=>{}); if(comboCount > 0) { let pauseDuration = Date.now() - pauseStartTime; lastHitTime += pauseDuration; } } 
+    }
+    
+    function updateShopUI() { 
+        const gunContainer = document.getElementById('guns-container'); gunContainer.innerHTML = ''; 
+        guns.forEach(g => { 
+            const div = document.createElement('div'); div.className = 'item'; div.style.borderColor = g.owned ? '#2ecc71' : '#444'; 
+            let label = g.owned ? (currentGun.id === g.id ? 'SELECTED' : 'SELECT') : g.price + ' P';
+            div.innerHTML = `<span>${g.name}</span> <span style="color:#f1c40f">${label}</span>`; 
+            div.onclick = () => { if(g.owned) { currentGun = g; gunNameDisplay.innerText = g.name; updateAmmoDisplay(); handleShopToggle(); } else if(score >= g.price) { score -= g.price; g.owned = true; scoreElement.innerText = score; updateShopUI(); } }; 
+            gunContainer.appendChild(div); 
+        }); 
+        const gloveContainer = document.getElementById('gloves-container'); gloveContainer.innerHTML = '';
+        gloves.forEach(gl => {
+            const div = document.createElement('div'); div.className = 'item'; div.style.borderColor = gl.owned ? '#2ecc71' : '#444';
+            let statusText = gl.owned ? (currentGlove && currentGlove.id === gl.id ? 'EQUIPPED' : 'EQUIP') : gl.price + ' P';
+            div.innerHTML = `<span>${gl.name} (+${Math.round(gl.bonus*100)}% SPD)</span> <span style="color:#2ecc71">${statusText}</span>`;
+            div.onclick = () => { if(gl.owned) { currentGlove = gl; updateShopUI(); } else if(score >= gl.price) { score -= gl.price; gl.owned = true; scoreElement.innerText = score; updateShopUI(); } }; 
+            gloveContainer.appendChild(div);
+        });
+    }
+
+    function startGame() { 
+        document.getElementById('start-overlay').style.display = 'none'; 
+        isPaused = false; 
+        autoPlayMusic(); 
+        initEnv(); 
+        if(gameTime === 0) animate(); 
+    }
+
+    setInterval(() => { if(!isPaused && birds.length < 10) birds.push(new Bird()); }, 1200);
+    
+    window.onload = () => {
+        setLanguage('tr');
+        runIntroAnimation();
+    };
+</script>
+</body>
+</html>
