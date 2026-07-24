@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Qaşqaldağ Hunter 4.0 - Pro</title>
+    <title>Qaşqaldağ Hunter 4.0 - Pro (Firebase)</title>
+    
+    <!-- Firebase SDK Compat -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Nosifer&family=Oswald:wght@700&family=Special+Elite&display=swap');
         body { margin: 0; overflow: hidden; background: #000; cursor: none; font-family: 'Courier New', Courier, monospace; touch-action: none; -webkit-user-select: none; user-select: none; }
@@ -351,6 +356,19 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
+    // --- FIREBASE INITIALIZATION ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyCtpBlQe9oyieTJjJU5_Y9YoMy7ksy4fM4",
+        authDomain: "qasqaldag-c050f.firebaseapp.com",
+        projectId: "qasqaldag-c050f",
+        storageBucket: "qasqaldag-c050f.firebasestorage.app",
+        messagingSenderId: "648554735500",
+        appId: "1:648554735500:web:a2d31fcbd3a9122c1d18a9",
+        measurementId: "G-ENHZ0EHKZY"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
     const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
     const scoreEl = document.getElementById('score'), gunNameDisp = document.getElementById('gun-name-display');
     const ammoCountEl = document.getElementById('ammo-count'), heartsCont = document.getElementById('hearts-container');
@@ -378,32 +396,10 @@
     let comboCount = 0, lastHitTime = 0, comboLimit = 3000, pauseStartTime = 0, lastEventTime = 0, lastTouchTime = 0, currentLang = 'tr';
     let lastTime = performance.now();
 
-    // Account & Authentication System State
     let currentUser = null;
 
-    function openLoginModal() {
-        document.getElementById('login-modal').style.display = 'flex';
-        document.getElementById('login-name-input').value = '';
-        document.getElementById('login-code-input').value = '';
-        document.getElementById('login-error-msg').innerText = '';
-    }
-
-    function closeLoginModal() {
-        document.getElementById('login-modal').style.display = 'none';
-    }
-
-    function openRegisterModal() {
-        document.getElementById('register-modal').style.display = 'flex';
-        document.getElementById('register-name-input').value = '';
-        document.getElementById('register-code-input').value = '';
-        document.getElementById('register-error-msg').innerText = '';
-    }
-
-    function closeRegisterModal() {
-        document.getElementById('register-modal').style.display = 'none';
-    }
-
-    function handleLoginSubmit() {
+    // --- CLOUD AUTHENTICATION (FIREBASE FIRESTORE) ---
+    async function handleLoginSubmit() {
         let nameInput = document.getElementById('login-name-input').value.trim();
         let codeInput = document.getElementById('login-code-input').value.trim();
         let errEl = document.getElementById('login-error-msg');
@@ -413,22 +409,27 @@
             return;
         }
 
-        let accounts = JSON.parse(localStorage.getItem('qaşqaldağ_accounts') || '[]');
-        let existing = accounts.find(acc => acc.name.toLowerCase() === nameInput.toLowerCase());
+        try {
+            let docRef = db.collection('accounts').doc(nameInput.toLowerCase());
+            let doc = await docRef.get();
 
-        if (existing) {
-            if (existing.code === codeInput) {
-                currentUser = existing;
-                successAuth();
+            if (doc.exists) {
+                let data = doc.data();
+                if (data.code === codeInput) {
+                    currentUser = data;
+                    successAuth();
+                } else {
+                    errEl.innerText = currentLang === 'tr' ? "Yanlış şifre!" : "Incorrect code!";
+                }
             } else {
-                errEl.innerText = currentLang === 'tr' ? "Yanlış şifre!" : "Incorrect code!";
+                errEl.innerText = currentLang === 'tr' ? "Böyle bir hesap bulunamadı, kayıt olmalısınız!" : "Account not found, please register!";
             }
-        } else {
-            errEl.innerText = currentLang === 'tr' ? "Böyle bir hesap bulunamadı, kayıt olmalısınız!" : "Account not found, please register!";
+        } catch (e) {
+            errEl.innerText = currentLang === 'tr' ? "Bağlantı hatası!" : "Connection error!";
         }
     }
 
-    function handleRegisterSubmit() {
+    async function handleRegisterSubmit() {
         let nameInput = document.getElementById('register-name-input').value.trim();
         let codeInput = document.getElementById('register-code-input').value.trim();
         let errEl = document.getElementById('register-error-msg');
@@ -438,43 +439,58 @@
             return;
         }
 
-        let accounts = JSON.parse(localStorage.getItem('qaşqaldağ_accounts') || '[]');
-        let existing = accounts.find(acc => acc.name.toLowerCase() === nameInput.toLowerCase());
+        try {
+            let docRef = db.collection('accounts').doc(nameInput.toLowerCase());
+            let doc = await docRef.get();
 
-        if (existing) {
-            errEl.innerText = currentLang === 'tr' ? "Bu kullanıcı adı zaten alınmış!" : "Username already exists!";
-        } else {
-            let newAcc = { name: nameInput, code: codeInput, score: 0 };
-            accounts.push(newAcc);
-            localStorage.setItem('qaşqaldağ_accounts', JSON.stringify(accounts));
-            currentUser = newAcc;
-            successAuth();
+            if (doc.exists) {
+                errEl.innerText = currentLang === 'tr' ? "Bu kullanıcı adı zaten alınmış!" : "Username already exists!";
+            } else {
+                let newAcc = { name: nameInput, code: codeInput, score: 0 };
+                await docRef.set(newAcc);
+                currentUser = newAcc;
+                successAuth();
+            }
+        } catch (e) {
+            errEl.innerText = currentLang === 'tr' ? "Bağlantı hatası!" : "Connection error!";
         }
     }
+
+    async function saveUserScore() {
+        if (!currentUser) return;
+        if (score > currentUser.score) {
+            currentUser.score = score;
+            try {
+                await db.collection('accounts').doc(currentUser.name.toLowerCase()).update({
+                    score: currentUser.score
+                });
+            } catch(e) { console.error(e); }
+        }
+    }
+
+    function openLoginModal() {
+        document.getElementById('login-modal').style.display = 'flex';
+        document.getElementById('login-name-input').value = '';
+        document.getElementById('login-code-input').value = '';
+        document.getElementById('login-error-msg').innerText = '';
+    }
+
+    function closeLoginModal() { document.getElementById('login-modal').style.display = 'none'; }
+    function openRegisterModal() {
+        document.getElementById('register-modal').style.display = 'flex';
+        document.getElementById('register-name-input').value = '';
+        document.getElementById('register-code-input').value = '';
+        document.getElementById('register-error-msg').innerText = '';
+    }
+    function closeRegisterModal() { document.getElementById('register-modal').style.display = 'none'; }
 
     function successAuth() {
         closeLoginModal();
         closeRegisterModal();
         document.getElementById('auth-buttons-container').style.display = 'none';
-        
         let userDisplay = document.getElementById('logged-in-user-display');
         userDisplay.innerText = `${currentLang === 'tr' ? 'Hesap' : 'Account'}: ${currentUser.name}`;
         userDisplay.style.display = 'block';
-    }
-
-    function saveUserScore() {
-        if (!currentUser) return;
-        if (score > currentUser.score) {
-            currentUser.score = score;
-            let accounts = JSON.parse(localStorage.getItem('qaşqaldağ_accounts') || '[]');
-            let idx = accounts.findIndex(acc => acc.name.toLowerCase() === currentUser.name.toLowerCase());
-            if (idx !== -1) {
-                accounts[idx].score = currentUser.score;
-            } else {
-                accounts.push(currentUser);
-            }
-            localStorage.setItem('qaşqaldağ_accounts', JSON.stringify(accounts));
-        }
     }
 
     function updateHealthDisplay() {
@@ -858,7 +874,7 @@
 
         let correctDir = Math.random() < 0.5 ? 'left' : 'right';
         if (dir === correctDir) {
-            // Correct direction, dodged successfully
+            // Correct direction
         } else {
             playerHP = Math.max(0, playerHP - 1);
             updateHealthDisplay();
@@ -1240,34 +1256,32 @@
         if (timeBigEl) timeBigEl.innerText = timeStr;
     }, 1000);
     
-    function updateLeaderboardUI() {
+    // --- CLOUD LEADERBOARD (FIREBASE) ---
+    async function updateLeaderboardUI() {
         const listContainer = document.getElementById('leaderboard-list');
-        listContainer.innerHTML = '';
+        listContainer.innerHTML = 'Yükleniyor...';
         
-        let accounts = JSON.parse(localStorage.getItem('qaşqaldağ_accounts') || '[]');
-        
-        if (currentUser) {
-            let existingIdx = accounts.findIndex(acc => acc.name.toLowerCase() === currentUser.name.toLowerCase());
-            if (existingIdx !== -1) {
-                accounts[existingIdx].score = Math.max(accounts[existingIdx].score, currentUser.score);
-            } else {
-                accounts.push(currentUser);
-            }
+        try {
+            let snapshot = await db.collection('accounts').orderBy('score', 'desc').limit(15).get();
+            listContainer.innerHTML = '';
+            
+            let rank = 1;
+            snapshot.forEach(doc => {
+                let p = doc.data();
+                const item = document.createElement('div');
+                let isCurrentAcc = currentUser && p.name.toLowerCase() === currentUser.name.toLowerCase();
+                item.className = 'leaderboard-item' + (isCurrentAcc ? ' player-rank' : '');
+                item.innerHTML = `
+                    <span class="leaderboard-rank">#${rank}</span>
+                    <span class="leaderboard-name">${p.name}</span>
+                    <span class="leaderboard-score">${p.score} P</span>
+                `;
+                listContainer.appendChild(item);
+                rank++;
+            });
+        } catch(e) {
+            listContainer.innerHTML = 'Sıralama yüklenemedi.';
         }
-
-        accounts.sort((a, b) => b.score - a.score);
-
-        accounts.forEach((p, idx) => {
-            const item = document.createElement('div');
-            let isCurrentAcc = currentUser && p.name.toLowerCase() === currentUser.name.toLowerCase();
-            item.className = 'leaderboard-item' + (isCurrentAcc ? ' player-rank' : '');
-            item.innerHTML = `
-                <span class="leaderboard-rank">#${idx + 1}</span>
-                <span class="leaderboard-name">${p.name}</span>
-                <span class="leaderboard-score">${p.score} P</span>
-            `;
-            listContainer.appendChild(item);
-        });
     }
 
     function updateShopUI() { 
