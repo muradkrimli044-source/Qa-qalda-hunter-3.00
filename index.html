@@ -410,7 +410,6 @@
                 currentUser = doc.data();
                 successAuth();
             } else {
-                // First time login, ask for a unique name
                 openNameModal(user);
             }
         }
@@ -420,10 +419,17 @@
         let errEl = document.getElementById('login-error-msg');
         errEl.innerText = "";
         let provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({
+            prompt: 'select_account'
+        });
         try {
-            await auth.signInWithRedirect(provider);
+            await auth.signInWithPopup(provider);
         } catch (e) {
-            errEl.innerText = currentLang === 'tr' ? "Giriş başarısız oldu!" : "Login failed!";
+            try {
+                await auth.signInWithRedirect(provider);
+            } catch (err) {
+                errEl.innerText = currentLang === 'tr' ? "Giriş başarısız oldu!" : "Login failed!";
+            }
         }
     }
 
@@ -440,7 +446,6 @@
         if (!user) return;
 
         try {
-            // Check if name already exists
             let nameQuery = await db.collection('accounts').where('name', '==', nameInput).get();
             if (!nameQuery.empty) {
                 errEl.innerText = currentLang === 'tr' ? "Bu oyun adı zaten alınmış!" : "This game name is already taken!";
@@ -1089,235 +1094,210 @@
                     saveUserScore();
                     bossMusic.pause(); bossMusic.currentTime = 0; if (!musicMuted) bgMusic.play().catch(()=>{});
                     let spText = document.getElementById('special-text');
-                    spText.style.color = "#ffff00"; spText.innerText = currentLang === 'tr' ? "NAYGRON MƏHV EDİLDİ!" : "NAYGRON DESTROYED!";
-                    spText.classList.add('show-text'); setTimeout(() => { spText.classList.remove('show-text'); spText.innerText = "QAŞQALDAĞ"; }, 1500);
+                    spText.style.color = "#ffff00"; spText.innerText = currentLang === 'tr' ? "NAYGRON YENİLDİ!" : "NAYGRON DEFEATED!";
+                    spText.classList.add('show-text'); setTimeout(() => spText.classList.remove('show-text'), 2500);
                 }
                 return;
             }
         }
 
         for(let i = birds.length - 1; i >= 0; i--) {
-            let b = birds[i], birdX = b.x + 15 * b.size, birdY = b.y + 7 * b.size;
-            if(Math.hypot(mouse.x - birdX, mouse.y - birdY) < 70 * b.size) { 
-                Array.from({length: 8}).forEach(() => particles.push(new Particle(birdX, birdY, false))); 
-                Array.from({length: 12}).forEach(() => particles.push(new Particle(birdX, birdY, true))); 
-                birds.splice(i, 1); comboCount++; lastHitTime = Date.now();
-                comboCountEl.innerText = comboCount; if(comboCount >= 2) comboUI.style.display = 'block';
-                score++; hitCounter++; scoreEl.innerText = score; 
+            let b = birds[i];
+            if(Math.hypot(mouse.x - b.x, mouse.y - b.y) < 35) {
+                Array.from({length: 12}).forEach(() => particles.push(new Particle(b.x, b.y, true)));
+                birds.splice(i, 1);
+                
+                let hitTime = Date.now();
+                if(hitTime - lastHitTime < comboLimit) {
+                    comboCount++;
+                } else {
+                    comboCount = 1;
+                }
+                lastHitTime = hitTime;
+                
+                if(comboCount > 1) {
+                    comboUI.style.display = 'block';
+                    comboCountEl.innerText = comboCount;
+                }
+
+                let bonusMultiplier = currentGlove ? (1 + currentGlove.bonus) : 1;
+                let addedScore = Math.floor(10 * bonusMultiplier * (1 + (comboCount - 1) * 0.2));
+                score += addedScore;
+                scoreEl.innerText = score;
                 saveUserScore();
-                if(hitCounter % 10 === 0) { let st = document.getElementById('special-text'); st.classList.add('show-text'); setTimeout(()=>st.classList.remove('show-text'), 1200); }
-                break;
-            } 
+
+                if(score >= 100 && !bossSpawnedOnce && bosses.length === 0) {
+                    bossSpawnedOnce = true;
+                    bosses.push(new BossBird());
+                }
+                return;
+            }
         }
     }
-    
-    const handleFire = (e) => {
-        if(isSlaveMode || e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('.item, .settings-box, #shop-menu, .login-box, #login-modal, #name-modal') || ['close-phone', 'virtual-joystick', 'joystick-knob'].includes(e.target.id) || e.target.classList.contains('color-dot') || e.target.classList.contains('lang-btn')) return;
-        autoPlayMusic();
-        if(currentGun.auto) { if(!isFiring) { isFiring = true; shoot(); fireInterval = setInterval(shoot, currentGun.fireRate); } } 
-        else { shoot(); }
-    };
-
-    window.addEventListener('mousedown', e => { 
-        if (isSlaveMode) {
-            if (!hasFlappyStarted) hasFlappyStarted = true;
-            playerBird.vy = -6;
-            return;
-        }
-        if (Date.now() - lastTouchTime < 500) return; if (e.button === 0) handleFire(e); 
-    });
-    window.addEventListener('touchstart', e => { 
-        lastTouchTime = Date.now(); 
-        if(isSlaveMode) {
-            if (!hasFlappyStarted) hasFlappyStarted = true;
-            playerBird.vy = -6;
-            return;
-        }
-        if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('.item, .settings-box, #shop-menu, .login-box, #login-modal, #name-modal') || ['close-phone', 'virtual-joystick', 'joystick-knob'].includes(e.target.id) || e.target.classList.contains('color-dot') || e.target.classList.contains('lang-btn')) return;
-        if (e.cancelable) e.preventDefault(); 
-        let t = e.touches[0]; updateCrosshair(t.clientX, t.clientY); handleFire(e); 
-    }, {passive: false});
-
-    window.addEventListener('mouseup', () => { isFiring = false; clearInterval(fireInterval); });
-    window.addEventListener('touchend', () => { isFiring = false; clearInterval(fireInterval); });
-    window.addEventListener('touchmove', e => { 
-        if(isSlaveMode || e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('.item, .settings-box, #shop-menu, .login-box, #login-modal, #name-modal') || ['close-phone', 'virtual-joystick', 'joystick-knob'].includes(e.target.id) || e.target.classList.contains('color-dot') || e.target.classList.contains('lang-btn')) return; 
-        let t = e.touches[0]; updateCrosshair(t.clientX, t.clientY); 
-    }, {passive: false});
 
     function startReload() {
-        if(isReloading || isBossAttacking || isSlaveMode) return; isFiring = false; clearInterval(fireInterval); isReloading = true;
-        reloadContainer.style.display = 'block'; reloadBarFill.style.width = '0%';
-        let actualReloadTime = currentGun.reloadTime * (currentGlove ? (1 - currentGlove.bonus) : 1);
-        let rInterval = setInterval(() => { if (gunRecoil < 140) gunRecoil += 15; }, 16); 
-        let startTime = Date.now();
-        let barInterval = setInterval(() => {
-            let progress = Math.min(100, ((Date.now() - startTime) / actualReloadTime) * 100);
-            reloadBarFill.style.width = progress + '%';
-            if (progress >= 100) clearInterval(barInterval);
-        }, 16);
-        setTimeout(() => { clearInterval(rInterval); clearInterval(barInterval); currentGun.currentAmmo = currentGun.maxAmmo; updateAmmoDisplay(); isReloading = false; gunRecoil = 0; reloadContainer.style.display = 'none'; }, actualReloadTime); 
+        if(isReloading) return;
+        isReloading = true; reloadContainer.style.display = 'block';
+        reloadBarFill.style.transition = `width ${currentGun.reloadTime}ms linear`; reloadBarFill.style.width = '100%';
+        setTimeout(() => {
+            currentGun.currentAmmo = currentGun.maxAmmo; updateAmmoDisplay();
+            isReloading = false; reloadContainer.style.display = 'none'; reloadBarFill.style.transition = 'none'; reloadBarFill.style.width = '0%';
+        }, currentGun.reloadTime);
     }
 
-    function togglePause() { 
-        if (isBossAttacking || isSlaveMode) return;
-        isPaused = !isPaused; 
-        document.getElementById('pause-overlay').style.display = isPaused ? 'flex' : 'none'; 
-        if(isPaused) { 
-            bgMusic.pause(); bossMusic.pause(); isFiring = false; clearInterval(fireInterval); pauseStartTime = Date.now();
-            document.getElementById('main-menu-btn').style.display = 'block';
-        } else { 
-            if(!musicMuted) (bosses.length > 0 ? bossMusic : bgMusic).play().catch(()=>{});
-            if(comboCount > 0) lastHitTime += Date.now() - pauseStartTime; 
-        } 
+    window.addEventListener('mousedown', e => {
+        if (e.button === 0) {
+            if (isSlaveMode) {
+                if(!isPaused) { hasFlappyStarted = true; playerBird.vy = -7; }
+            } else {
+                autoPlayMusic(); shoot();
+                if (currentGun.auto && !isFiring) {
+                    isFiring = setInterval(() => { if (currentGun.currentAmmo > 0) shoot(); else clearInterval(isFiring); }, currentGun.fireRate);
+                }
+            }
+        }
+    });
+
+    window.addEventListener('mouseup', () => { if (isFiring) { clearInterval(isFiring); isFiring = null; } });
+    window.addEventListener('keydown', e => { if (e.code === 'KeyR') startReload(); });
+
+    canvas.addEventListener('touchstart', e => {
+        let touch = e.touches[0];
+        updateCrosshair(touch.clientX, touch.clientY);
+        if(isSlaveMode) {
+            if(!isPaused) { hasFlappyStarted = true; playerBird.vy = -7; }
+        } else {
+            autoPlayMusic(); shoot();
+        }
+    }, {passive: true});
+
+    function startGame() {
+        document.getElementById('start-overlay').style.display = 'none';
+        isPaused = false; updateHealthDisplay(); updateAmmoDisplay();
+        if(!musicMuted) { bgMusic.volume = 0.4; bgMusic.play().catch(()=>{}); }
+        setInterval(() => { if(!isPaused && !isSlaveMode && bosses.length === 0 && birds.length < 4) birds.push(new Bird()); }, 1500);
     }
-    
+
+    function togglePause() {
+        if (isBossAttacking) return;
+        isPaused = !isPaused;
+        document.getElementById('pause-overlay').style.display = isPaused ? 'flex' : 'none';
+        document.getElementById('main-menu-btn').style.display = 'block';
+        if(isPaused) pauseStartTime = Date.now(); else lastHitTime += (Date.now() - pauseStartTime);
+    }
+
     function resetToMainMenu() {
-        isPaused = true; score = 0; hitCounter = 0; comboCount = 0; isBossAttacking = false; bossSpawnedOnce = false; isSlaveMode = false; hasFlappyStarted = false; bossHitsTaken = 0;
-        bosses.forEach(b => b.destroy()); birds = []; bosses = []; particles = []; clawMarks = []; obstacles = [];
-        bossChoiceBox.classList.remove('show-choice'); bossChoiceBox.style.display = 'none';
-        bossAttackBox.classList.remove('show-choice'); bossAttackBox.style.display = 'none';
-        virtualJoystick.style.display = 'none';
-        document.getElementById('ui').style.display = 'block';
-        document.getElementById('ui-bottom-buttons').style.display = 'flex';
-        crosshair.style.display = 'flex'; gameoverOverlay.style.display = 'none';
-        playerHP = 10; updateHealthDisplay(); scoreEl.innerText = "0"; comboUI.style.display = 'none';
+        isPaused = true; score = 0; playerHP = 10; birds = []; bosses = []; particles = [];
+        scoreEl.innerText = score; updateHealthDisplay();
         document.getElementById('pause-overlay').style.display = 'none';
+        gameoverOverlay.style.display = 'none';
+        bossChoiceBox.style.display = 'none'; bossChoiceBox.classList.remove('show-choice');
+        bossAttackBox.style.display = 'none'; bossAttackBox.classList.remove('show-choice');
         document.getElementById('start-overlay').style.display = 'flex';
-        document.querySelectorAll('.drop-word').forEach(w => w.classList.remove('animate-drop'));
-        document.querySelectorAll('.show-btn').forEach(b => b.classList.remove('show-btn'));
-        runIntroAnimation(); bgMusic.pause(); bgMusic.currentTime = 0; bossMusic.pause(); bossMusic.currentTime = 0;
+        bgMusic.pause(); bgMusic.currentTime = 0; bossMusic.pause(); bossMusic.currentTime = 0;
+        isSlaveMode = false; hasFlappyStarted = false; crosshair.style.display = 'flex';
+        document.getElementById('ui-bottom-buttons').style.display = 'flex';
+        bossSpawnedOnce = false;
     }
 
     function restartGame() {
-        bosses.forEach(b => b.destroy()); birds = []; bosses = []; particles = []; clawMarks = []; obstacles = [];
-        isBossAttacking = false; bossSpawnedOnce = false; isSlaveMode = false; hasFlappyStarted = false; bossHitsTaken = 0;
-        bossChoiceBox.classList.remove('show-choice'); bossChoiceBox.style.display = 'none';
-        bossAttackBox.classList.remove('show-choice'); bossAttackBox.style.display = 'none';
-        virtualJoystick.style.display = 'none';
-        document.getElementById('ui').style.display = 'block';
-        document.getElementById('ui-bottom-buttons').style.display = 'flex';
-        crosshair.style.display = 'flex'; gameoverOverlay.style.display = 'none';
-        score = 0; hitCounter = 0; comboCount = 0; playerHP = 10; updateHealthDisplay();
-        scoreEl.innerText = "0"; comboUI.style.display = 'none'; isPaused = false;
-        autoPlayMusic(); initEnv();
+        gameoverOverlay.style.display = 'none';
+        resetToMainMenu();
+        startGame();
     }
 
-    function handleShopToggle() { 
-        if (isBossAttacking || isSlaveMode) return;
-        isShopOpen = !isShopOpen; isPaused = isShopOpen; 
-        document.getElementById('shop-menu').style.display = isShopOpen ? 'block' : 'none'; 
-        if(isShopOpen) { 
-            openPhoneApp('home'); updateShopUI(); updateLeaderboardUI(); bgMusic.pause(); bossMusic.pause(); isFiring = false; clearInterval(fireInterval); pauseStartTime = Date.now(); 
-        } else { 
-            if(!musicMuted) (bosses.length > 0 ? bossMusic : bgMusic).play().catch(()=>{});
-            if(comboCount > 0) lastHitTime += Date.now() - pauseStartTime; 
-        } 
+    function handleShopToggle() {
+        isShopOpen = !isShopOpen;
+        document.getElementById('shop-menu').style.display = isShopOpen ? 'block' : 'none';
+        isPaused = isShopOpen;
+        if(isShopOpen) { updateShopUI(); updateLeaderboardUI(); updatePhoneClock(); }
+    }
+
+    function updatePhoneClock() {
+        let now = new Date();
+        let timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        let options = { weekday: 'long', day: 'numeric', month: 'long' };
+        let dateStr = now.toLocaleDateString(currentLang === 'tr' ? 'tr-TR' : 'en-US', options);
+        document.getElementById('phone-clock').innerText = timeStr;
+        document.getElementById('phone-time-big').innerText = timeStr;
+        document.getElementById('phone-date-sub').innerText = dateStr;
     }
 
     function openPhoneApp(appName) {
         document.querySelectorAll('.phone-view').forEach(v => v.classList.remove('active-view'));
-        document.getElementById('phone-' + appName + '-view').classList.add('active-view');
-        if(appName === 'leaderboard') updateLeaderboardUI();
+        if(appName === 'home') document.getElementById('phone-home-view').classList.add('active-view');
+        else if(appName === 'shop') { document.getElementById('phone-shop-view').classList.add('active-view'); updateShopUI(); }
+        else if(appName === 'gallery') document.getElementById('phone-gallery-view').classList.add('active-view');
+        else if(appName === 'leaderboard') { document.getElementById('phone-leaderboard-view').classList.add('active-view'); updateLeaderboardUI(); }
     }
 
     function loadWallpaper(event) {
         let file = event.target.files[0];
-        if (file) {
+        if(file) {
             let reader = new FileReader();
-            reader.onload = function(e) {
-                document.getElementById('phone-screen-content').style.backgroundImage = `url('${e.target.result}')`;
-            }
+            reader.onload = function(e) { document.getElementById('phone-screen-content').style.backgroundImage = `url('${e.target.result}')`; }
             reader.readAsDataURL(file);
         }
     }
 
-    function resetWallpaper() {
-        document.getElementById('phone-screen-content').style.backgroundImage = 'none';
-    }
+    function resetWallpaper() { document.getElementById('phone-screen-content').style.backgroundImage = 'none'; }
 
-    setInterval(() => {
-        let now = new Date();
-        let timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-        let clockEl = document.getElementById('phone-clock');
-        let timeBigEl = document.getElementById('phone-time-big');
-        if (clockEl) clockEl.innerText = timeStr;
-        if (timeBigEl) timeBigEl.innerText = timeStr;
-    }, 1000);
-    
-    // --- CLOUD LEADERBOARD (FIREBASE) ---
     async function updateLeaderboardUI() {
-        const listContainer = document.getElementById('leaderboard-list');
-        listContainer.innerHTML = 'Yükleniyor...';
+        let listContainer = document.getElementById('leaderboard-list');
+        listContainer.innerHTML = '<div style="color: #aaa; text-align: center; padding: 20px;">Yükleniyor...</div>';
         
         try {
-            let snapshot = await db.collection('accounts').orderBy('score', 'desc').limit(15).get();
+            let snapshot = await db.collection('accounts').orderBy('score', 'desc').limit(20).get();
             listContainer.innerHTML = '';
-            
             let rank = 1;
             snapshot.forEach(doc => {
-                let p = doc.data();
-                const item = document.createElement('div');
-                let isCurrentAcc = currentUser && p.uid === currentUser.uid;
-                item.className = 'leaderboard-item' + (isCurrentAcc ? ' player-rank' : '');
-                item.innerHTML = `
-                    <span class="leaderboard-rank">#${rank}</span>
-                    <span class="leaderboard-name">${p.name}</span>
-                    <span class="leaderboard-score">${p.score} P</span>
-                `;
-                listContainer.appendChild(item);
+                let data = doc.data();
+                let isPlayer = currentUser && data.uid === currentUser.uid;
+                let itemDiv = document.createElement('div');
+                itemDiv.className = `leaderboard-item ${isPlayer ? 'player-rank' : ''}`;
+                itemDiv.innerHTML = `<span class="leaderboard-rank">#${rank}</span><span class="leaderboard-name">${data.name}</span><span class="leaderboard-score">${data.score}</span>`;
+                listContainer.appendChild(itemDiv);
                 rank++;
             });
         } catch(e) {
-            listContainer.innerHTML = 'Sıralama yüklenemedi.';
+            listContainer.innerHTML = '<div style="color: #e74c3c; text-align: center; padding: 20px;">Sıralama yüklenemedi.</div>';
         }
     }
 
-    function updateShopUI() { 
-        const t = translations[currentLang];
-        const gunCont = document.getElementById('guns-container'); gunCont.innerHTML = ''; 
-        guns.forEach(g => { 
-            const div = document.createElement('div'); div.className = 'item'; div.style.borderColor = g.owned && currentGun.id === g.id ? '#2ecc71' : '#444'; 
-            let stateText = g.owned ? (currentGun.id === g.id ? t.selectedState : t.selectState) : (g.price + ' P');
-            div.innerHTML = `<div class="item-visual" style="background:${g.color}; border: 2px solid ${g.sideColor};"></div><span>${g.name}</span><span class="item-price">${stateText}</span>`; 
-            div.onclick = () => { if(g.owned) { currentGun = g; gunNameDisp.innerText = g.name; updateAmmoDisplay(); handleShopToggle(); } else if(score >= g.price) { score -= g.price; g.owned = true; scoreEl.innerText = score; updateShopUI(); saveUserScore(); } }; 
-            gunCont.appendChild(div); 
-        }); 
+    function updateShopUI() {
+        let gunsContainer = document.getElementById('guns-container');
+        gunsContainer.innerHTML = '';
+        guns.forEach(g => {
+            let div = document.createElement('div'); div.className = 'item';
+            let statusText = g.owned ? (currentGun.id === g.id ? translations[currentLang].equippedState : translations[currentLang].equipState) : `${g.price} 🪙`;
+            div.innerHTML = `<div class="item-visual" style="border-bottom: 3px solid ${g.color};">🔫</div><span>${g.name}</span><div class="item-price">${statusText}</div>`;
+            div.onclick = () => {
+                if(g.owned) { currentGun = g; updateAmmoDisplay(); gunNameDisp.innerText = g.name; updateShopUI(); }
+                else if(score >= g.price) { score -= g.price; scoreEl.innerText = score; g.owned = true; currentGun = g; updateAmmoDisplay(); gunNameDisp.innerText = g.name; updateShopUI(); saveUserScore(); }
+            };
+            gunsContainer.appendChild(div);
+        });
 
-        const gloveCont = document.getElementById('gloves-container'); gloveCont.innerHTML = '';
+        let glovesContainer = document.getElementById('gloves-container');
+        glovesContainer.innerHTML = '';
         gloves.forEach(gl => {
-            const div = document.createElement('div'); div.className = 'item'; div.style.borderColor = gl.owned && currentGlove && currentGlove.id === gl.id ? '#2ecc71' : '#444';
-            let gloveName = currentLang === 'en' ? gl.nameEn : gl.name;
-            let stateText = gl.owned ? (currentGlove && currentGlove.id === gl.id ? t.equippedState : t.equipState) : (gl.price + ' P');
-            div.innerHTML = `<div class="item-visual" style="background:#333; border: 2px solid #2ecc71; font-size:16px; color:#2ecc71;">🧤</div><span>${gloveName}</span><span class="item-price">+${Math.round(gl.bonus*100)}% HIZ | ${stateText}</span>`;
-            div.onclick = () => { if(gl.owned) { currentGlove = gl; updateShopUI(); } else if(score >= gl.price) { score -= gl.price; gl.owned = true; scoreEl.innerText = score; updateShopUI(); saveUserScore(); } }; 
-            gloveCont.appendChild(div);
+            let div = document.createElement('div'); div.className = 'item';
+            let isEq = currentGlove && currentGlove.id === gl.id;
+            let statusText = gl.owned ? (isEq ? translations[currentLang].selectedState : translations[currentLang].selectState) : `${gl.price} 🪙`;
+            let nameVal = currentLang === 'tr' ? gl.name : gl.nameEn;
+            div.innerHTML = `<div class="item-visual" style="color: #2ecc71;">🧤</div><span>${nameVal}</span><div class="item-price">${statusText}</div>`;
+            div.onclick = () => {
+                if(gl.owned) { currentGlove = isEq ? null : gl; updateShopUI(); }
+                else if(score >= gl.price) { score -= gl.price; scoreEl.innerText = score; gl.owned = true; currentGlove = gl; updateShopUI(); saveUserScore(); }
+            };
+            glovesContainer.appendChild(div);
         });
     }
 
-    function startGame() { 
-        document.getElementById('start-overlay').style.display = 'none'; 
-        isPaused = false; playerHP = 10; updateHealthDisplay(); autoPlayMusic(); initEnv(); 
-        if(gameTime === 0) { lastTime = performance.now(); requestAnimationFrame(animate); }
-    }
-
-    setInterval(() => { 
-        if(!isPaused && !isSlaveMode) {
-            if(bosses.length === 0) {
-                if(!isBossAttacking && birds.length < 10) birds.push(new Bird()); 
-            } else {
-                birds = [];
-            }
-            if(score > 0 && score % 30 === 0 && bosses.length === 0 && !bossSpawnedOnce) { 
-                birds = [];
-                bosses.push(new BossBird()); 
-                bossSpawnedOnce = true; 
-            }
-            if(score % 30 !== 0) bossSpawnedOnce = false;
-        }
-    }, 1000);
-
-    window.onload = runIntroAnimation;
+    initEnv();
+    runIntroAnimation();
+    requestAnimationFrame(animate);
 </script>
 </body>
 </html>
+
