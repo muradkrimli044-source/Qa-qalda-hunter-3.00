@@ -1006,7 +1006,7 @@
                                 playerHP = 0; updateHealthDisplay(); checkGameOver();
                             }
                             if (!obs.passed && obs.worldX < playerBird.worldX) {
-                                obs.passed = true; score += 5; scoreEl.innerText = score;
+                                obs.passed = true; score += 1; scoreEl.innerText = score;
                                 saveUserScore();
                             }
                         }
@@ -1052,6 +1052,11 @@
 
     function updateCrosshair(x, y) { mouse.x = x; mouse.y = y; crosshair.style.left = x + 'px'; crosshair.style.top = y + 'px'; }
     window.addEventListener('mousemove', e => updateCrosshair(e.clientX, e.clientY));
+    window.addEventListener('touchmove', e => {
+        if (e.touches.length > 0) {
+            updateCrosshair(e.touches[0].clientX, e.touches[0].clientY);
+        }
+    }, {passive: true});
 
     function shoot() {
         if(isPaused || isShopOpen || isReloading || isSlaveMode || isBossAttacking) return; 
@@ -1067,7 +1072,10 @@
             osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.1);
         }
         currentGun.currentAmmo--; updateAmmoDisplay(); 
-        if(currentGun.currentAmmo <= 0 && !isReloading) startReload();
+        if(currentGun.currentAmmo <= 0) {
+            if(isFiring) { clearInterval(isFiring); isFiring = null; }
+            if(!isReloading) startReload();
+        }
 
         gunRecoil = -35; muzzleFlash = 4; shake = currentGun.shake;
         
@@ -1103,8 +1111,10 @@
 
         for(let i = birds.length - 1; i >= 0; i--) {
             let b = birds[i];
-            if(Math.hypot(mouse.x - b.x, mouse.y - b.y) < 35) {
-                Array.from({length: 12}).forEach(() => particles.push(new Particle(b.x, b.y, true)));
+            let birdCenterX = b.x + 20;
+            let birdCenterY = b.y + 2;
+            if(Math.hypot(mouse.x - birdCenterX, mouse.y - birdCenterY) < 45) {
+                Array.from({length: 12}).forEach(() => particles.push(new Particle(b.x + 20, b.y + 2, true)));
                 birds.splice(i, 1);
                 
                 let hitTime = Date.now();
@@ -1120,13 +1130,11 @@
                     comboCountEl.innerText = comboCount;
                 }
 
-                let bonusMultiplier = currentGlove ? (1 + currentGlove.bonus) : 1;
-                let addedScore = Math.floor(10 * bonusMultiplier * (1 + (comboCount - 1) * 0.2));
-                score += addedScore;
+                score += 1;
                 scoreEl.innerText = score;
                 saveUserScore();
 
-                if(score >= 100 && !bossSpawnedOnce && bosses.length === 0) {
+                if(score >= 50 && !bossSpawnedOnce && bosses.length === 0) {
                     bossSpawnedOnce = true;
                     bosses.push(new BossBird());
                 }
@@ -1137,22 +1145,31 @@
 
     function startReload() {
         if(isReloading) return;
-        isReloading = true; reloadContainer.style.display = 'block';
-        reloadBarFill.style.transition = `width ${currentGun.reloadTime}ms linear`; reloadBarFill.style.width = '100%';
+        isReloading = true; 
+        reloadContainer.style.display = 'block';
+        reloadBarFill.style.transition = 'none'; 
+        reloadBarFill.style.width = '0%';
+        reloadBarFill.offsetHeight; 
+        reloadBarFill.style.transition = `width ${currentGun.reloadTime}ms linear`; 
+        reloadBarFill.style.width = '100%';
+        
         setTimeout(() => {
-            currentGun.currentAmmo = currentGun.maxAmmo; updateAmmoDisplay();
-            isReloading = false; reloadContainer.style.display = 'none'; reloadBarFill.style.transition = 'none'; reloadBarFill.style.width = '0%';
+            currentGun.currentAmmo = currentGun.maxAmmo; 
+            updateAmmoDisplay();
+            isReloading = false; 
+            reloadContainer.style.display = 'none';
         }, currentGun.reloadTime);
     }
 
     window.addEventListener('mousedown', e => {
         if (e.button === 0) {
+            if (Date.now() - lastTouchTime < 500) return;
             if (isSlaveMode) {
                 if(!isPaused) { hasFlappyStarted = true; playerBird.vy = -7; }
             } else {
                 autoPlayMusic(); shoot();
                 if (currentGun.auto && !isFiring) {
-                    isFiring = setInterval(() => { if (currentGun.currentAmmo > 0) shoot(); else clearInterval(isFiring); }, currentGun.fireRate);
+                    isFiring = setInterval(() => { if (currentGun.currentAmmo > 0) shoot(); else { clearInterval(isFiring); isFiring = null; } }, currentGun.fireRate);
                 }
             }
         }
@@ -1162,6 +1179,7 @@
     window.addEventListener('keydown', e => { if (e.code === 'KeyR') startReload(); });
 
     canvas.addEventListener('touchstart', e => {
+        lastTouchTime = Date.now();
         let touch = e.touches[0];
         updateCrosshair(touch.clientX, touch.clientY);
         if(isSlaveMode) {
@@ -1183,7 +1201,11 @@
         isPaused = !isPaused;
         document.getElementById('pause-overlay').style.display = isPaused ? 'flex' : 'none';
         document.getElementById('main-menu-btn').style.display = 'block';
-        if(isPaused) pauseStartTime = Date.now(); else lastHitTime += (Date.now() - pauseStartTime);
+        if(isPaused) {
+            pauseStartTime = Date.now();
+        } else {
+            if(lastHitTime > 0) lastHitTime += (Date.now() - pauseStartTime);
+        }
     }
 
     function resetToMainMenu() {
