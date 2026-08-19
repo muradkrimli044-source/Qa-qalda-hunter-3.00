@@ -377,6 +377,8 @@
 
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+    document.addEventListener('fullscreenchange', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+    document.addEventListener('webkitfullscreenchange', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
 
     let score = 0, birds = [], bosses = [], clouds = [], particles = [], gameTrees = [], gameScenery = [], weatherParticles = []; 
     let targetWeather = "sunny", mouse = { x: canvas.width / 2, y: canvas.height / 2 };
@@ -389,6 +391,7 @@
     let isAbducting = false, abductionStart = 0;
     let graphicsQuality = 'ultra';
     let birdSpawnInterval = null;
+    let gameStarted = false;
     let naygronDefeated = false, ufoBossDefeated = false;
     let nightEyes = null, nightUfo = null;
     let boatBob = 0;
@@ -1664,9 +1667,37 @@
     canvas.addEventListener('touchend', stopFiring);
     canvas.addEventListener('touchcancel', stopFiring);
 
+    function requestFullscreenSafe() {
+        // Fullscreen must be triggered from a user gesture (the OYNA tap qualifies).
+        // Wrapped in try/catch + .catch() since some mobile browsers (notably iOS
+        // Safari) don't support the Fullscreen API on arbitrary elements and would
+        // otherwise throw/reject and break the rest of startGame().
+        let el = document.documentElement;
+        let req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+        if (req) { try { let p = req.call(el); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+    }
+
+    // Auto-pause whenever the tab/app is backgrounded (screen locked, app switched,
+    // browser minimized) so obstacles/timers don't keep advancing off-screen and kill
+    // the player while they're not looking - this especially affects the flappy-bird
+    // "bird potion" mode where gravity and pipes keep moving every frame regardless
+    // of what triggered the original pause.
+    function autoPauseIfHidden() {
+        if (!gameStarted) return;
+        if (isPaused || isBossAttacking || isAbducting) return;
+        isPaused = true;
+        document.getElementById('pause-overlay').style.display = 'flex';
+        document.getElementById('main-menu-btn').style.display = 'block';
+        pauseStartTime = Date.now();
+    }
+    document.addEventListener('visibilitychange', () => { if (document.hidden) autoPauseIfHidden(); });
+    window.addEventListener('blur', autoPauseIfHidden);
+    window.addEventListener('pagehide', autoPauseIfHidden);
+
     function startGame() {
         document.getElementById('start-overlay').style.display = 'none';
-        isPaused = false; updateHealthDisplay(); updateAmmoDisplay();
+        isPaused = false; gameStarted = true; updateHealthDisplay(); updateAmmoDisplay();
+        requestFullscreenSafe();
         if(!musicMuted) { bgMusic.volume = 0.4; bgMusic.play().catch(()=>{}); }
         if (birdSpawnInterval) clearInterval(birdSpawnInterval);
         birdSpawnInterval = setInterval(() => { if(!isPaused && !isSlaveMode && bosses.length === 0 && !ufoBoss && birds.length < 4) birds.push(new Bird()); }, 1500);
@@ -1682,7 +1713,7 @@
     }
 
     function resetToMainMenu() {
-        isPaused = true; score = 0; playerHP = 10; birds = [];
+        isPaused = true; gameStarted = false; score = 0; playerHP = 10; birds = [];
         if (birdSpawnInterval) { clearInterval(birdSpawnInterval); birdSpawnInterval = null; }
         bosses.forEach(bo => bo.destroy()); bosses = [];
         if (ufoBoss) { ufoBoss.destroy(); ufoBoss = null; }
